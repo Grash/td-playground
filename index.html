@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+body {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  margin: auto;
+  position: relative;
+  width: 960px;
+}
+
+text {
+  font: 10px sans-serif;
+}
+
+.axis path,
+.axis line {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+
+form {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+}
+
+</style>
+<div id="demo">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
+<script>
+  var data = [
+      {x: 10, y: 30, key: 0, speed: 8, index: 0}];
+  var bulletData = [];
+
+  var path = [{x: 200}, {y: 180}/*, {x: 100}, {y: 30}, {x: 280}*/];
+  var xMax = 270;
+  var key = 1;
+  var bulletKey = 1;
+  var xFn = function(d){
+    return d.x; 
+  }
+  var counter = 0;
+
+  var x = d3.time.scale()
+    .range([10, 280])
+
+  var y = d3.scale.linear()
+   .range([180, 10])
+
+   var svg = d3.select("#demo").append("svg:svg")
+   .attr("width", 300)
+   .attr("height", 200)
+
+  var refresh = function() {
+
+    var circles = svg.selectAll(".enemy").data(data, function(d,i){return d.key;})
+
+    circles.enter()
+     .append("svg:circle")
+     .attr("id", function(d){/*console.log("ENTER CIRCLE: key", d.key);*/return 'key'+d.key})
+     .attr("r", 4)
+     .attr("cx", function(d) { return d.x; })
+     .attr("cy", function(d) { return d.y })
+     .classed("enemy", true);
+
+    circles
+     .interrupt() 
+     .transition()
+     .attr("cx", function(d){return ('x' in path[d.index]) ? path[d.index].x : this.getAttribute("cx");})
+     .attr("cy", function(d) { return ('y' in path[d.index]) ? path[d.index].y : this.getAttribute("cy");})
+     .duration(calculateDuration)
+     .ease("linear")
+     .each("end", nextPhase);
+
+    /*circles.exit()
+     .transition()
+     .attr("r", 10)
+     .attr("fill", "red")
+     .style('opacity',0)
+     .duration(200)
+     .each("end", function(d){
+      console.log("ENEMY END");
+      d3.select(this).remove();});*/
+
+  }
+
+  var enemyExit = function(){
+	var circles = svg.selectAll(".enemy").data(data, function(d,i){return d.key;});
+	circles.exit()
+        .transition()
+        .attr("r", 10)
+        .attr("fill", "red")
+        .style('opacity',0)
+        .duration(200)
+        .each("end", function(d){
+          console.log("ENEMY END");
+          d3.select(this).remove();});
+  }
+
+  var refreshBullet = function(){
+    var bullets = svg.selectAll(".bullet").data(bulletData, function(d){return d.key;});
+
+    bullets.enter()
+      .append("svg:circle")
+      .attr("id", function(d){/*console.log("ENTER: ", d.key);*/return d.key})
+      .attr("r", 2)
+      .attr("fill", "green")
+      .classed('bullet',true)
+      .attr("cx", function(d) { return d.x; })
+      .attr("cy", function(d) { return d.y });
+
+    bullets
+      .interrupt()
+      .transition()
+      .attr("cx", function(d){
+        //console.log("CX: ", d.target.x);
+        return d.target.x;})
+      .attr("cy", function(d){
+        //console.log("CY: ", d.target.y);
+        return d.target.y;})
+      .ease("linear")
+      .duration(calculateBulletDuration)
+      .each("end", function(d){
+        //console.log("BULLET END: ", d.key);
+        bulletData.splice(bulletData.indexOf(d), 1);
+        d3.select(this)
+        .transition()
+        .attr("r", 5)
+        .attr("fill", "red")
+        .style('opacity',0)
+        .duration(200)
+        .each("end", function(d){
+          d3.select(this).remove();});
+      })
+    bullets.exit()
+	.interrupt()
+        .transition()
+	.attr("r", 5)
+        .attr("fill", "red")
+        .style('opacity',0)
+        .duration(200)
+        .each("end", function(d){
+          d3.select(this).remove();});
+
+  }
+    
+
+  function nextPhase(d){
+    if(d.index+1 < path.length){
+      d.index += 1;
+      d3.select(this)
+          .transition()
+            .attr("cx", function(d){return ('x' in path[d.index]) ? path[d.index].x : this.getAttribute("cx");})
+            .attr("cy", function(d) { return ('y' in path[d.index]) ? path[d.index].y : this.getAttribute("cy");})
+            .duration(calculateDuration)
+            .ease("linear")
+            .each("end", nextPhase)
+    } else {
+      data.splice(data.indexOf(d), 1);
+      enemyExit();
+    }
+  }
+
+  var getDistance = function(actPos, nextPos){
+      return Math.abs(nextPos - actPos);
+    }
+
+  var calculateDuration= function(d){
+    var distance = 'x' in path[d.index] ? getDistance(this.getAttribute("cx"), path[d.index].x) : getDistance(this.getAttribute("cy"), path[d.index].y);
+        var dur = distance/d.speed*100;
+        return dur;
+  }
+
+  var calculateBulletDuration = function(d){
+      var distanceX = getDistance(this.getAttribute("cx"), d.target.x);
+      var distanceY = getDistance(this.getAttribute("cy"), d.target.y);
+      var distance = 0;
+      if(distanceX == 0 || distanceY == 0){
+        distance = distanceX == 0 ? distanceY : distanceX;
+      } else {
+        distance = Math.sqrt(Math.pow(distanceX,2)+Math.pow(distanceY,2));
+      }
+      var dur = distance / d.speed*100;
+      //console.log("DURATION: ", dur);
+      return dur;
+  }
+
+  refresh();
+
+  setInterval(function() {
+    data.push({x: 10, y: 30, key: key++, speed: 8, index: 0});
+    data[data.length-2].speed = 4;
+
+    refresh();
+  }, 1000);
+
+  setInterval(function(){
+    bulletData.forEach(function(bullet, i){
+      var tar = d3.select("#" + bullet.targetId);
+      if(!tar.empty()){
+        bullet.target.x = tar.attr("cx");
+        bullet.target.y = tar.attr("cy");
+      } else {
+        bulletData.splice(bulletData.indexOf(bullet), 1);
+      }
+      
+      //console.log("BULLET: ", bullet);
+    })
+
+    var targetId = "key" + data[0].key;
+    var target = d3.select("#"+targetId);
+    var bTarget = {
+      x: target.attr("cx"),
+      y: target.attr("cy")
+    }
+    if(counter === 5){
+      bulletData.push({x: 125, y: 105, key: "b"+bulletKey++, speed: 12, target: bTarget, targetId: targetId});
+      bulletData.push({x: 155, y: 105, key: "b"+bulletKey++, speed: 12, target: bTarget, targetId: targetId});
+      bulletData.push({x: 125, y: 85, key: "b"+bulletKey++, speed: 12, target: bTarget, targetId: targetId});
+      bulletData.push({x: 155, y: 85, key: "b"+bulletKey++, speed: 12, target: bTarget, targetId: targetId});
+	counter = 0;
+    } else {
+	counter++;
+    }    
+    refreshBullet();
+    //refresh();
+  }, 100);
+</script>
